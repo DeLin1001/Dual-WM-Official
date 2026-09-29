@@ -31,8 +31,6 @@ checkpoints/
 
 Each task directory also includes `config.json` and an `evaluation.yaml` configuration snapshot. Use this repository's `scripts/plan/config/` files for evaluation with the current default paths. With the required datasets under `datasets/`, run `python -m scripts.plan.eval_wm -cn tworoom` from the repository root. If set, `STABLEWM_HOME` and `DUALWM_CHECKPOINT_DIR` override the default paths. Datasets are not included in the checkpoint archive.
 
-Archive SHA-256: `57bcf47d41eb27c650ec6c27515354fbc3956133c7d5b8d81f6426bf8acf6ebf`.
-
 ## Training
 
 ```bash
