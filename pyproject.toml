@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dual-wm"
+version = "0.1.0"
+description = "Dual-WM: visual world models at two temporal scales"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.6", "torchvision>=0.21", "numpy", "einops", "loguru",
+  "gymnasium>=1.0", "pillow", "hydra-core>=1.3", "h5py", "hdf5plugin",
+  "scikit-learn", "stable-pretraining>=0.1.7", "transformers>=4.50", "lightning>=2.4"
+]
+
+[project.optional-dependencies]
+envs = ["pygame>=2.5", "pymunk>=7,<8", "shapely", "opencv-python-headless", "mujoco", "dm-control", "ogbench>=1.2"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["stable_worldmodel*", "scripts*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"scripts.plan" = ["config/*.yaml", "task_definitions/*.json"]
+"scripts.train" = ["config/*.yaml"]

@@ -1,0 +1,235 @@
+stage: low
+stages:
+  low:
+    wm:
+      loss_scope: low
+      history_size: 3
+      num_rollout_steps: 5
+      rollout_loss_weighting: exponential
+      rollout_loss_alpha: 0.5
+      window_size: 3
+      high_level_history_size: 1
+      high_level_enabled: false
+      high_level_rollout_steps: 6
+      macro_action_alignment: endpoint_transition
+    data:
+      dataset:
+        num_steps: 8
+        frameskip: 5
+        name: tworoom.h5
+        keys_to_load:
+        - pixels
+        - action
+        - proprio
+        keys_to_cache:
+        - action
+        - proprio
+    train_control:
+      freeze_modules:
+      - temporal_encoder
+      - high_level_predictor
+      - macro_action_encoder
+      - compatibility
+      eval_frozen_modules: true
+    init_from: null
+    init_from_scope: all
+    output_model_name: low_tworoom
+  high:
+    wm:
+      loss_scope: high
+      history_size: 3
+      num_rollout_steps: 5
+      rollout_loss_weighting: exponential
+      rollout_loss_alpha: 0.5
+      window_size: 3
+      high_level_history_size: 1
+      high_level_enabled: true
+      high_level_rollout_steps: 6
+      macro_action_alignment: endpoint_transition
+    data:
+      dataset:
+        num_steps: 21
+        frameskip: 5
+        name: tworoom.h5
+        keys_to_load:
+        - pixels
+        - action
+        - proprio
+        keys_to_cache:
+        - action
+        - proprio
+    train_control:
+      freeze_modules:
+      - encoder
+      - predictor
+      - action_encoder
+      - projector
+      - pred_proj
+      - compatibility
+      eval_frozen_modules: true
+    init_from: ${oc.env:DUALWM_CHECKPOINT_DIR,./checkpoints}/TwoRoomCPT/TwoRoomCPT.pt
+    init_from_scope: low_only
+    output_model_name: high_tworoom
+seed: 42
+img_size: 224
+train_split: 0.9
+wm:
+  loss_scope: ${stages.${stage}.wm.loss_scope}
+  history_size: 3
+  num_rollout_steps: 5
+  rollout_loss_weighting: exponential
+  rollout_loss_alpha: 0.5
+  window_size: 3
+  high_level_history_size: 1
+  high_level_enabled: ${stages.${stage}.wm.high_level_enabled}
+  high_level_rollout_steps: 6
+  macro_action_alignment: endpoint_transition
+data:
+  dataset:
+    num_steps: ${stages.${stage}.data.dataset.num_steps}
+    frameskip: 5
+    name: tworoom.h5
+    keys_to_load:
+    - pixels
+    - action
+    - proprio
+    keys_to_cache:
+    - action
+    - proprio
+loss:
+  weight: 0.3
+  low_sigreg_weight: 0.3
+  high_sigreg_weight: 0.3
+  macro_action_sigreg_weight: 0.3
+  lambda_H: 1.0
+  sigreg:
+    kwargs:
+      num_projections: 4096
+      distributed: true
+  macro_action_kl:
+    beta: 0.01
+    warmup_epochs: 2
+    free_bits: 0.05
+loader:
+  batch_size: 128
+  num_workers: 4
+  val_num_workers: 2
+  drop_last: true
+  persistent_workers: true
+  prefetch_factor: 2
+  pin_memory: true
+  shuffle: true
+  multiprocessing_context: spawn
+optimizer:
+  type: AdamW
+  lr: 5e-05
+  weight_decay: 0.001
+trainer:
+  max_epochs: 5
+  devices: 2
+  accelerator: gpu
+  strategy: ddp_find_unused_parameters_true
+  precision: bf16
+  gradient_clip_val: 1.0
+train_control:
+  freeze_modules: ${stages.${stage}.train_control.freeze_modules}
+  eval_frozen_modules: true
+model:
+  _target_: stable_worldmodel.wm.dual_wm.dual_wm.DualWM
+  window_size: 3
+  high_level_history_size: 1
+  high_level_predictor_context: current_only
+  macro_action_alignment: endpoint_transition
+  encoder:
+    _target_: stable_pretraining.backbone.utils.vit_hf
+    size: tiny
+    patch_size: 14
+    image_size: 224
+    pretrained: false
+    use_mask_token: false
+  predictor:
+    _target_: stable_worldmodel.wm.lewm.module.Predictor
+    num_frames: 3
+    input_dim: 192
+    hidden_dim: 192
+    output_dim: 192
+    depth: 6
+    heads: 16
+    mlp_dim: 2048
+    dim_head: 64
+    dropout: 0.1
+  action_encoder:
+    _target_: stable_worldmodel.wm.lewm.module.Embedder
+    input_dim: 10
+    emb_dim: 192
+  projector:
+    _target_: stable_worldmodel.wm.lewm.module.MLP
+    input_dim: 192
+    output_dim: 192
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+  pred_proj:
+    _target_: stable_worldmodel.wm.lewm.module.MLP
+    input_dim: 192
+    output_dim: 192
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+  temporal_encoder:
+    _target_: stable_worldmodel.wm.dual_wm.module.TemporalEncoder
+    input_dim: 192
+    pooling: last_token
+    depth: 4
+    heads: 8
+    dim_head: 64
+    mlp_dim: 768
+    dropout: 0.1
+  high_level_predictor:
+    _target_: stable_worldmodel.wm.lewm.module.Predictor
+    num_frames: 1
+    input_dim: 192
+    hidden_dim: 192
+    output_dim: 192
+    depth: 6
+    heads: 16
+    mlp_dim: 2048
+    dim_head: 64
+    dropout: 0.1
+  macro_action_encoder:
+    _target_: stable_worldmodel.wm.dual_wm.module.MacroActionEncoder
+    input_dim: 10
+    output_dim: 192
+    u_dim: 16
+    hidden_dim: 192
+    depth: 4
+    heads: 8
+    dim_head: 64
+    mlp_dim: 768
+    dropout: 0.1
+    latent_mode: variational
+    logvar_min: -10.0
+    logvar_max: 5.0
+  compatibility:
+    _target_: stable_worldmodel.wm.dual_wm.module.CrossLevelCompatibilityMLP
+    dim: 192
+    hidden_dim: 768
+    depth: 2
+    dropout: 0.0
+    temperature: 0.1
+    learnable_temperature: true
+    max_logit_scale: 30.0
+    bias_init: label_prior
+    learnable_bias: true
+cache_dir: ${oc.env:STABLEWM_HOME,.}
+init_from: ${stages.${stage}.init_from}
+init_from_scope: ${stages.${stage}.init_from_scope}
+output_model_name: ${stages.${stage}.output_model_name}
+defaults:
+- override hydra/job_logging: disabled
+hydra:
+  output_subdir: null
+  run:
+    dir: .

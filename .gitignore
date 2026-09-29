@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+assets/
+outputs/
+/datasets/*
+!/datasets/.gitkeep
+/checkpoints/**
+!/checkpoints/**/
+!/checkpoints/**/.gitkeep
+*.ckpt
+.venv/

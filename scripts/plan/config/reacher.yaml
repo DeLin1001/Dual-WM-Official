@@ -1,0 +1,86 @@
+cache_dir: ${oc.env:STABLEWM_HOME,.}
+solver:
+  _target_: stable_worldmodel.solver.HierarchicalCEMSolver
+  embed_dim: 192
+  u_dim: 16
+  batch_size: 10
+  var_scale: 1.0
+  device: cuda
+  seed: 42
+  u_num_samples: 100
+  u_n_steps: 20
+  u_topk: 10
+  u_horizon: 6
+  u_prior_constraint: none
+  u_prior_kl_limit: 0.1
+  subgoal_rerank_topk: 1
+  subgoal_rerank_num_samples: 64
+  subgoal_rerank_n_steps: 5
+  subgoal_rerank_elite: 8
+  subgoal_rerank_weight: 0.5
+  subgoal_rerank_normalization: minmax
+  subgoal_rerank_refine_steps: 5
+  subgoal_rerank_reuse_actions: true
+  high_level_guidance_steps: 2
+  high_level_start_context: repeat_current
+  allow_padded_high_level_start: true
+  max_high_level_replans: 3
+  final_after_macro_complete: false
+  reset_low_level_warm_start_on_objective_change: true
+  a_num_samples: 300
+  a_n_steps: 30
+  a_topk: 30
+  high_level_guidance_macro_steps: null
+  high_level_replan_interval: 1
+  final_receding_horizon: 1
+world:
+  env_name: swm/ReacherDMControl-v0
+  num_envs: 200
+  max_episode_steps: 250
+  task: qpos_match
+dataset:
+  stats: reacher_planning_o100.h5
+  keys_to_cache:
+  - action
+seed: 42
+policy: ${oc.env:DUALWM_CHECKPOINT_DIR,./checkpoints}/ReacherCPT/ReacherCPT.pt
+plan_config:
+  horizon: 5
+  receding_horizon: 1
+  action_block: 5
+  warm_start: true
+subgoal_cost:
+  mode: dynamic_window_aligned
+high_level_goal_cost:
+  mode: lift_mse
+eval:
+  num_eval: 200
+  goal_offset_steps: 100
+  eval_budget: 125
+  img_size: 224
+  dataset_name: reacher_planning_o100.h5
+  callables:
+  - method: set_state
+    args:
+      qpos:
+        value: qpos
+      qvel:
+        value: qvel
+  - method: set_target_qpos
+    args:
+      target_qpos:
+        value: goal_qpos
+  sample_num_eval: 200
+  task_offset: 0
+  env_batch_size: 10
+  reuse_env_batches: true
+compile: false
+bf16: false
+output:
+  filename: outputs/reacher_o100.json
+defaults:
+- override hydra/job_logging: disabled
+hydra:
+  output_subdir: null
+  run:
+    dir: .
