@@ -11,5 +11,6 @@ outputs/
 /checkpoints/**
 !/checkpoints/**/
 !/checkpoints/**/.gitkeep
+/dual-wm-checkpoints.tar.gz
 *.ckpt
 .venv/
